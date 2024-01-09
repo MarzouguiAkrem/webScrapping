@@ -107,7 +107,6 @@ def display_data():
 if __name__ == '__main__':
     app.run(debug=True)
 """
-"""
 import requests
 from bs4 import BeautifulSoup
 import csv
@@ -206,82 +205,4 @@ from app import app
 
 if __name__ == '__main__':
     app.run(debug=True)
-"""
-import os
-from werkzeug.utils import secure_filename
-from flask import Flask, render_template, request, redirect, flash
-import requests
-from bs4 import BeautifulSoup
-import csv
 
-app = Flask(__name__)
-
-# Définissez la configuration avant de l'utiliser dans le reste du code
-app.config['UPLOAD_FOLDER'] = '/home/akrem/Téléchargements/scra-web-main/netflixurl.txt'
-app.secret_key = 'votre_clé_secrète'
-
-def scrape_and_display_data(target_url):
-    resp = requests.get(target_url)
-    soup = BeautifulSoup(resp.text, 'html.parser')
-
-    # Exemple d'extraction de données (remplacez par votre logique de scraping réelle)
-    name = soup.find("h1", {"class": "title-title"}).text if soup.find("h1", {"class": "title-title"}) else "Not available"
-    seasons = soup.find("span", {"class": "duration"}).text if soup.find("span", {"class": "duration"}) else "Not available"
-    about = soup.find("div", {"class": "hook-text"}).text if soup.find("div", {"class": "hook-text"}) else "Not available"
-
-    episodes = soup.find("ol", {"class": "episodes-container"}).find_all("li")
-    episode_titles = [episode.find("h3", {"class": "episode-title"}).text for episode in episodes]
-    episode_descriptions = [episode.find("p", {"class": "episode-synopsis"}).text if episode.find("p", {"class": "episode-synopsis"}) else "Not available" for episode in episodes]
-
-    genres_elements = soup.find_all("span", {"class": "item-genres"})
-    genres = [genre.text.replace(",", "") for genre in genres_elements]
-
-    moods_elements = soup.find_all("span", {"class": "item-mood-tag"})
-    moods = [mood.text.replace(",", "") for mood in moods_elements]
-
-    cast_elements = soup.find_all("span", {"class": "item-cast"})
-    cast = [actor.text for actor in cast_elements]
-
-    # Écriture des données dans un fichier CSV
-    csv_file_path = "netflix_data.csv"
-    with open(csv_file_path, 'a', newline='', encoding='utf-8') as csv_file:
-        csv_writer = csv.writer(csv_file)
-
-        # Écriture des données
-        for i in range(len(episode_titles)):
-            data = [name, seasons, about, episode_titles[i], episode_descriptions[i], ", ".join(genres), ", ".join(moods), cast[i] if i < len(cast) else "Not available"]
-            csv_writer.writerow(data)
-
-    print(f"Les données ont été ajoutées au fichier CSV : {csv_file_path}")
-
-    return csv_file_path
-
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    if request.method == 'POST':
-        # Vérifie si le champ 'urls_file' est dans la requête
-        if 'urls_file' not in request.files:
-            flash('Aucun fichier sélectionné')
-            return redirect(request.url)
-
-        urls_file = request.files['urls_file']
-
-        # Vérifie si l'utilisateur a soumis un fichier
-        if urls_file.filename == '':
-            flash('Aucun fichier sélectionné')
-            return redirect(request.url)
-
-        # Vérifie si le fichier est un fichier texte (.txt)
-        if urls_file and urls_file.filename.endswith('.txt'):
-            # Utilisez secure_filename pour éviter des problèmes de sécurité
-            filename = secure_filename(urls_file.filename)
-            # Enregistrez le fichier dans un dossier temporaire (ou un dossier de votre choix)
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            urls_file.save(file_path)
-
-            return scrape_and_display_data(file_path)
-
-    return render_template('index.html')
-
-if __name__ == '__main__':
-    app.run(debug=True)
